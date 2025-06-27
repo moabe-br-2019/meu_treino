@@ -117,3 +117,10 @@ src/
 - 🔄 **Deploy Automático**: Integração com GitHub
 - 🛡️ **Segurança**: Proteção DDoS incluída
 - 📱 **PWA Ready**: Suporte a Progressive Web Apps 
+
+name = "gym-app"
+main = "worker.js"
+compatibility_date = "2024-06-01"
+
+[site]
+bucket = "./build" 
