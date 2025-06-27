@@ -1,0 +1,693 @@
+import React, { useState, useEffect } from 'react';
+import { Plus, Dumbbell, Check, X, Moon, Sun, Edit2, Trash2, Calendar, History } from 'lucide-react';
+
+const GymApp = () => {
+  const [darkMode, setDarkMode] = useState(true);
+  const [workouts, setWorkouts] = useState([]);
+  const [workoutHistory, setWorkoutHistory] = useState([]);
+  const [currentWorkout, setCurrentWorkout] = useState(null);
+  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [showEditForm, setShowEditForm] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
+  const [editingWorkout, setEditingWorkout] = useState(null);
+  const [newWorkout, setNewWorkout] = useState({ name: '', exercises: [] });
+  const [newExercise, setNewExercise] = useState({ name: '', sets: '', reps: '' });
+
+  // Carregar dados do localStorage
+  useEffect(() => {
+    const savedWorkouts = localStorage.getItem('gymWorkouts');
+    const savedHistory = localStorage.getItem('gymHistory');
+    const savedDarkMode = localStorage.getItem('darkMode');
+    
+    if (savedWorkouts) {
+      setWorkouts(JSON.parse(savedWorkouts));
+    }
+    if (savedHistory) {
+      setWorkoutHistory(JSON.parse(savedHistory));
+    }
+    if (savedDarkMode !== null) {
+      setDarkMode(JSON.parse(savedDarkMode));
+    }
+  }, []);
+
+  // Salvar no localStorage
+  useEffect(() => {
+    localStorage.setItem('gymWorkouts', JSON.stringify(workouts));
+  }, [workouts]);
+
+  useEffect(() => {
+    localStorage.setItem('gymHistory', JSON.stringify(workoutHistory));
+  }, [workoutHistory]);
+
+  useEffect(() => {
+    localStorage.setItem('darkMode', JSON.stringify(darkMode));
+  }, [darkMode]);
+
+  const addExerciseToNewWorkout = () => {
+    if (newExercise.name && newExercise.sets && newExercise.reps) {
+      const exerciseWithSets = {
+        id: Date.now(),
+        name: newExercise.name,
+        totalSets: parseInt(newExercise.sets),
+        reps: parseInt(newExercise.reps),
+        sets: Array.from({ length: parseInt(newExercise.sets) }, (_, index) => ({
+          id: `${Date.now()}-${index}`,
+          setNumber: index + 1,
+          completed: false,
+          weight: ''
+        }))
+      };
+      
+      setNewWorkout(prev => ({
+        ...prev,
+        exercises: [...prev.exercises, exerciseWithSets]
+      }));
+      setNewExercise({ name: '', sets: '', reps: '' });
+    }
+  };
+
+  const createWorkout = () => {
+    if (newWorkout.name && newWorkout.exercises.length > 0) {
+      setWorkouts(prev => [...prev, {
+        id: Date.now(),
+        name: newWorkout.name,
+        exercises: newWorkout.exercises,
+        createdAt: new Date().toLocaleDateString()
+      }]);
+      setNewWorkout({ name: '', exercises: [] });
+      setShowCreateForm(false);
+    }
+  };
+
+  const deleteWorkout = (workoutId) => {
+    setWorkouts(prev => prev.filter(w => w.id !== workoutId));
+    if (currentWorkout && currentWorkout.id === workoutId) {
+      setCurrentWorkout(null);
+    }
+  };
+
+  const editWorkout = (workout) => {
+    setEditingWorkout({ ...workout });
+    setShowEditForm(true);
+  };
+
+  const saveEditedWorkout = () => {
+    setWorkouts(prev => prev.map(w => w.id === editingWorkout.id ? editingWorkout : w));
+    if (currentWorkout && currentWorkout.id === editingWorkout.id) {
+      setCurrentWorkout(editingWorkout);
+    }
+    setShowEditForm(false);
+    setEditingWorkout(null);
+  };
+
+  const addExerciseToEditingWorkout = () => {
+    if (newExercise.name && newExercise.sets && newExercise.reps) {
+      const exerciseWithSets = {
+        id: Date.now(),
+        name: newExercise.name,
+        totalSets: parseInt(newExercise.sets),
+        reps: parseInt(newExercise.reps),
+        sets: Array.from({ length: parseInt(newExercise.sets) }, (_, index) => ({
+          id: `${Date.now()}-${index}`,
+          setNumber: index + 1,
+          completed: false,
+          weight: ''
+        }))
+      };
+      
+      setEditingWorkout(prev => ({
+        ...prev,
+        exercises: [...prev.exercises, exerciseWithSets]
+      }));
+      setNewExercise({ name: '', sets: '', reps: '' });
+    }
+  };
+
+  const removeExerciseFromEditingWorkout = (exerciseId) => {
+    setEditingWorkout(prev => ({
+      ...prev,
+      exercises: prev.exercises.filter(ex => ex.id !== exerciseId)
+    }));
+  };
+
+  const loadWorkout = (workout) => {
+    // Reset completion status when loading
+    const resetWorkout = {
+      ...workout,
+      exercises: workout.exercises.map(ex => ({
+        ...ex,
+        sets: ex.sets.map(set => ({ ...set, completed: false, weight: '' }))
+      })),
+      startedAt: new Date().toISOString()
+    };
+    setCurrentWorkout(resetWorkout);
+  };
+
+  const toggleSetComplete = (exerciseId, setId) => {
+    setCurrentWorkout(prev => ({
+      ...prev,
+      exercises: prev.exercises.map(ex =>
+        ex.id === exerciseId
+          ? {
+              ...ex,
+              sets: ex.sets.map(set =>
+                set.id === setId ? { ...set, completed: !set.completed } : set
+              )
+            }
+          : ex
+      )
+    }));
+  };
+
+  const updateSetWeight = (exerciseId, setId, weight) => {
+    setCurrentWorkout(prev => ({
+      ...prev,
+      exercises: prev.exercises.map(ex =>
+        ex.id === exerciseId
+          ? {
+              ...ex,
+              sets: ex.sets.map(set =>
+                set.id === setId ? { ...set, weight } : set
+              )
+            }
+          : ex
+      )
+    }));
+  };
+
+  const finishWorkout = () => {
+    if (currentWorkout) {
+      const completedWorkout = {
+        ...currentWorkout,
+        finishedAt: new Date().toISOString(),
+        date: new Date().toLocaleDateString(),
+        time: new Date().toLocaleTimeString(),
+        totalSets: currentWorkout.exercises.reduce((acc, ex) => acc + ex.sets.length, 0),
+        completedSets: currentWorkout.exercises.reduce((acc, ex) => 
+          acc + ex.sets.filter(set => set.completed).length, 0
+        )
+      };
+      
+      setWorkoutHistory(prev => [completedWorkout, ...prev]);
+      setCurrentWorkout(null);
+    }
+  };
+
+  const removeExerciseFromNewWorkout = (exerciseId) => {
+    setNewWorkout(prev => ({
+      ...prev,
+      exercises: prev.exercises.filter(ex => ex.id !== exerciseId)
+    }));
+  };
+
+  const getCompletedSetsCount = (exercise) => {
+    return exercise.sets.filter(set => set.completed).length;
+  };
+
+  const getTotalCompletedSets = () => {
+    if (!currentWorkout) return 0;
+    return currentWorkout.exercises.reduce((acc, ex) => 
+      acc + ex.sets.filter(set => set.completed).length, 0
+    );
+  };
+
+  const getTotalSets = () => {
+    if (!currentWorkout) return 0;
+    return currentWorkout.exercises.reduce((acc, ex) => acc + ex.sets.length, 0);
+  };
+
+  return (
+    <div className={`min-h-screen ${darkMode ? 'dark bg-gray-900' : 'bg-gray-50'}`}>
+      <div className="container mx-auto px-4 py-6 max-w-md">
+        {/* Header */}
+        <div className="flex justify-between items-center mb-6">
+          <h1 className={`text-2xl font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+            <Dumbbell className="inline mr-2" />
+            Meu Treino
+          </h1>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setShowHistory(!showHistory)}
+              className={`p-2 rounded-lg ${darkMode ? 'bg-gray-800 text-blue-400' : 'bg-gray-200 text-blue-600'}`}
+            >
+              <History size={20} />
+            </button>
+            <button
+              onClick={() => setDarkMode(!darkMode)}
+              className={`p-2 rounded-lg ${darkMode ? 'bg-gray-800 text-yellow-400' : 'bg-gray-200 text-gray-700'}`}
+            >
+              {darkMode ? <Sun size={20} /> : <Moon size={20} />}
+            </button>
+          </div>
+        </div>
+
+        {/* Workout History */}
+        {showHistory && (
+          <div className={`rounded-lg p-4 mb-6 ${darkMode ? 'bg-gray-800' : 'bg-white'} shadow-lg`}>
+            <div className="flex justify-between items-center mb-4">
+              <h2 className={`text-xl font-semibold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                Histórico de Treinos
+              </h2>
+              <button
+                onClick={() => setShowHistory(false)}
+                className={`p-2 rounded-lg ${darkMode ? 'bg-gray-700 text-gray-300' : 'bg-gray-200 text-gray-600'}`}
+              >
+                <X size={16} />
+              </button>
+            </div>
+            
+            {workoutHistory.length === 0 ? (
+              <p className={`text-center ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                Nenhum treino finalizado ainda
+              </p>
+            ) : (
+              <div className="space-y-3 max-h-80 overflow-y-auto">
+                {workoutHistory.map((workout, index) => (
+                  <div
+                    key={index}
+                    className={`p-3 rounded-lg ${darkMode ? 'bg-gray-700' : 'bg-gray-50'}`}
+                  >
+                    <div className="flex justify-between items-start mb-2">
+                      <h3 className={`font-semibold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                        {workout.name}
+                      </h3>
+                      <span className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                        {workout.time}
+                      </span>
+                    </div>
+                    <p className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>
+                      {workout.date}
+                    </p>
+                    <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                      {workout.completedSets}/{workout.totalSets} séries completadas
+                    </p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Current Workout View */}
+        {currentWorkout && (
+          <div className={`rounded-lg p-4 mb-6 ${darkMode ? 'bg-gray-800' : 'bg-white'} shadow-lg`}>
+            <div className="flex justify-between items-center mb-4">
+              <div>
+                <h2 className={`text-xl font-semibold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                  {currentWorkout.name}
+                </h2>
+                <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                  <Calendar className="inline w-4 h-4 mr-1" />
+                  {new Date(currentWorkout.startedAt).toLocaleString()}
+                </p>
+              </div>
+              <button
+                onClick={() => setCurrentWorkout(null)}
+                className={`p-2 rounded-lg ${darkMode ? 'bg-gray-700 text-gray-300' : 'bg-gray-200 text-gray-600'}`}
+              >
+                <X size={16} />
+              </button>
+            </div>
+            
+            <div className="space-y-4">
+              {currentWorkout.exercises.map((exercise) => (
+                <div
+                  key={exercise.id}
+                  className={`p-3 rounded-lg ${darkMode ? 'bg-gray-700' : 'bg-gray-50'}`}
+                >
+                  <div className="flex justify-between items-center mb-3">
+                    <h3 className={`font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                      {exercise.name}
+                    </h3>
+                    <span className={`text-sm px-2 py-1 rounded ${
+                      getCompletedSetsCount(exercise) === exercise.totalSets
+                        ? 'bg-green-600 text-white'
+                        : darkMode ? 'bg-gray-600 text-gray-300' : 'bg-gray-300 text-gray-600'
+                    }`}>
+                      {getCompletedSetsCount(exercise)}/{exercise.totalSets}
+                    </span>
+                  </div>
+                  
+                  <p className={`text-sm mb-3 ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>
+                    {exercise.reps} repetições por série
+                  </p>
+                  
+                  <div className="space-y-2">
+                    {exercise.sets.map((set) => (
+                      <div
+                        key={set.id}
+                        className={`flex items-center gap-2 p-2 rounded border-2 ${
+                          set.completed
+                            ? darkMode ? 'bg-green-900 border-green-600' : 'bg-green-50 border-green-300'
+                            : darkMode ? 'bg-gray-600 border-gray-500' : 'bg-white border-gray-300'
+                        }`}
+                      >
+                        <span className={`text-sm font-medium w-12 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                          {set.setNumber}ª
+                        </span>
+                        <input
+                          type="text"
+                          placeholder="Carga (kg)"
+                          value={set.weight}
+                          onChange={(e) => updateSetWeight(exercise.id, set.id, e.target.value)}
+                          className={`flex-1 px-2 py-1 rounded text-sm ${
+                            darkMode ? 'bg-gray-700 text-white' : 'bg-gray-100 text-gray-900'
+                          } border ${darkMode ? 'border-gray-600' : 'border-gray-300'}`}
+                        />
+                        <button
+                          onClick={() => toggleSetComplete(exercise.id, set.id)}
+                          className={`p-1 rounded ${
+                            set.completed
+                              ? 'bg-green-600 text-white'
+                              : darkMode ? 'bg-gray-500 text-gray-300' : 'bg-gray-300 text-gray-600'
+                          }`}
+                        >
+                          <Check size={16} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+            
+            <div className="mt-6 pt-4 border-t border-gray-600">
+              <div className="flex justify-between items-center mb-4">
+                <span className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>
+                  Progresso Total: {getTotalCompletedSets()} / {getTotalSets()} séries
+                </span>
+                <div className={`text-sm px-3 py-1 rounded-full ${
+                  getTotalCompletedSets() === getTotalSets()
+                    ? 'bg-green-600 text-white'
+                    : darkMode ? 'bg-gray-700 text-gray-300' : 'bg-gray-200 text-gray-700'
+                }`}>
+                  {Math.round((getTotalCompletedSets() / getTotalSets()) * 100)}%
+                </div>
+              </div>
+              <button
+                onClick={finishWorkout}
+                className="w-full px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium"
+              >
+                Finalizar Treino
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Create Workout Form */}
+        {showCreateForm && (
+          <div className={`rounded-lg p-4 mb-6 ${darkMode ? 'bg-gray-800' : 'bg-white'} shadow-lg`}>
+            <h2 className={`text-xl font-semibold mb-4 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+              Novo Treino
+            </h2>
+            
+            <input
+              type="text"
+              placeholder="Nome do treino"
+              value={newWorkout.name}
+              onChange={(e) => setNewWorkout(prev => ({ ...prev, name: e.target.value }))}
+              className={`w-full px-3 py-2 rounded-lg mb-4 ${
+                darkMode ? 'bg-gray-700 text-white' : 'bg-gray-50 text-gray-900'
+              } border ${darkMode ? 'border-gray-600' : 'border-gray-300'}`}
+            />
+            
+            <div className="grid grid-cols-3 gap-2 mb-4">
+              <input
+                type="text"
+                placeholder="Exercício"
+                value={newExercise.name}
+                onChange={(e) => setNewExercise(prev => ({ ...prev, name: e.target.value }))}
+                className={`col-span-3 px-3 py-2 rounded-lg ${
+                  darkMode ? 'bg-gray-700 text-white' : 'bg-gray-50 text-gray-900'
+                } border ${darkMode ? 'border-gray-600' : 'border-gray-300'}`}
+              />
+              <input
+                type="number"
+                placeholder="Séries"
+                value={newExercise.sets}
+                onChange={(e) => setNewExercise(prev => ({ ...prev, sets: e.target.value }))}
+                className={`px-3 py-2 rounded-lg ${
+                  darkMode ? 'bg-gray-700 text-white' : 'bg-gray-50 text-gray-900'
+                } border ${darkMode ? 'border-gray-600' : 'border-gray-300'}`}
+              />
+              <input
+                type="number"
+                placeholder="Reps"
+                value={newExercise.reps}
+                onChange={(e) => setNewExercise(prev => ({ ...prev, reps: e.target.value }))}
+                className={`px-3 py-2 rounded-lg ${
+                  darkMode ? 'bg-gray-700 text-white' : 'bg-gray-50 text-gray-900'
+                } border ${darkMode ? 'border-gray-600' : 'border-gray-300'}`}
+              />
+              <button
+                onClick={addExerciseToNewWorkout}
+                className="px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+              >
+                <Plus size={16} />
+              </button>
+            </div>
+            
+            {newWorkout.exercises.length > 0 && (
+              <div className="space-y-2 mb-4">
+                {newWorkout.exercises.map((exercise) => (
+                  <div
+                    key={exercise.id}
+                    className={`flex justify-between items-center p-3 rounded ${
+                      darkMode ? 'bg-gray-700' : 'bg-gray-100'
+                    }`}
+                  >
+                    <div>
+                      <span className={`font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                        {exercise.name}
+                      </span>
+                      <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                        {exercise.totalSets} séries x {exercise.reps} reps
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => removeExerciseFromNewWorkout(exercise.id)}
+                      className="text-red-500 hover:text-red-700"
+                    >
+                      <X size={16} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+            
+            <div className="flex gap-2">
+              <button
+                onClick={createWorkout}
+                className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+              >
+                Criar Treino
+              </button>
+              <button
+                onClick={() => {
+                  setShowCreateForm(false);
+                  setNewWorkout({ name: '', exercises: [] });
+                  setNewExercise({ name: '', sets: '', reps: '' });
+                }}
+                className={`px-4 py-2 rounded-lg ${
+                  darkMode ? 'bg-gray-700 text-gray-300' : 'bg-gray-200 text-gray-700'
+                }`}
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Edit Workout Form */}
+        {showEditForm && editingWorkout && (
+          <div className={`rounded-lg p-4 mb-6 ${darkMode ? 'bg-gray-800' : 'bg-white'} shadow-lg`}>
+            <h2 className={`text-xl font-semibold mb-4 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+              Editar Treino
+            </h2>
+            
+            <input
+              type="text"
+              placeholder="Nome do treino"
+              value={editingWorkout.name}
+              onChange={(e) => setEditingWorkout(prev => ({ ...prev, name: e.target.value }))}
+              className={`w-full px-3 py-2 rounded-lg mb-4 ${
+                darkMode ? 'bg-gray-700 text-white' : 'bg-gray-50 text-gray-900'
+              } border ${darkMode ? 'border-gray-600' : 'border-gray-300'}`}
+            />
+            
+            <div className="grid grid-cols-3 gap-2 mb-4">
+              <input
+                type="text"
+                placeholder="Exercício"
+                value={newExercise.name}
+                onChange={(e) => setNewExercise(prev => ({ ...prev, name: e.target.value }))}
+                className={`col-span-3 px-3 py-2 rounded-lg ${
+                  darkMode ? 'bg-gray-700 text-white' : 'bg-gray-50 text-gray-900'
+                } border ${darkMode ? 'border-gray-600' : 'border-gray-300'}`}
+              />
+              <input
+                type="number"
+                placeholder="Séries"
+                value={newExercise.sets}
+                onChange={(e) => setNewExercise(prev => ({ ...prev, sets: e.target.value }))}
+                className={`px-3 py-2 rounded-lg ${
+                  darkMode ? 'bg-gray-700 text-white' : 'bg-gray-50 text-gray-900'
+                } border ${darkMode ? 'border-gray-600' : 'border-gray-300'}`}
+              />
+              <input
+                type="number"
+                placeholder="Reps"
+                value={newExercise.reps}
+                onChange={(e) => setNewExercise(prev => ({ ...prev, reps: e.target.value }))}
+                className={`px-3 py-2 rounded-lg ${
+                  darkMode ? 'bg-gray-700 text-white' : 'bg-gray-50 text-gray-900'
+                } border ${darkMode ? 'border-gray-600' : 'border-gray-300'}`}
+              />
+              <button
+                onClick={addExerciseToEditingWorkout}
+                className="px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+              >
+                <Plus size={16} />
+              </button>
+            </div>
+            
+            {editingWorkout.exercises.length > 0 && (
+              <div className="space-y-2 mb-4">
+                {editingWorkout.exercises.map((exercise) => (
+                  <div
+                    key={exercise.id}
+                    className={`flex justify-between items-center p-3 rounded ${
+                      darkMode ? 'bg-gray-700' : 'bg-gray-100'
+                    }`}
+                  >
+                    <div>
+                      <span className={`font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                        {exercise.name}
+                      </span>
+                      <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                        {exercise.totalSets} séries x {exercise.reps} reps
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => removeExerciseFromEditingWorkout(exercise.id)}
+                      className="text-red-500 hover:text-red-700"
+                    >
+                      <X size={16} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+            
+            <div className="flex gap-2">
+              <button
+                onClick={saveEditedWorkout}
+                className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+              >
+                Salvar
+              </button>
+              <button
+                onClick={() => {
+                  setShowEditForm(false);
+                  setEditingWorkout(null);
+                  setNewExercise({ name: '', sets: '', reps: '' });
+                }}
+                className={`px-4 py-2 rounded-lg ${
+                  darkMode ? 'bg-gray-700 text-gray-300' : 'bg-gray-200 text-gray-700'
+                }`}
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Add Workout Button */}
+        {!showCreateForm && !showEditForm && !showHistory && (
+          <button
+            onClick={() => setShowCreateForm(true)}
+            className="w-full mb-6 px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center justify-center gap-2"
+          >
+            <Plus size={20} />
+            Novo Treino
+          </button>
+        )}
+
+        {/* Workouts List */}
+        {workouts.length > 0 && !showHistory && (
+          <div className="space-y-4">
+            <h2 className={`text-lg font-semibold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+              Meus Treinos
+            </h2>
+            {workouts.map((workout) => (
+              <div
+                key={workout.id}
+                className={`rounded-lg p-4 ${darkMode ? 'bg-gray-800' : 'bg-white'} shadow-lg`}
+              >
+                <div className="flex justify-between items-start mb-2">
+                  <div>
+                    <h3 className={`font-semibold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                      {workout.name}
+                    </h3>
+                    <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                      {workout.exercises.length} exercícios • {workout.createdAt}
+                    </p>
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => editWorkout(workout)}
+                      className={`p-2 rounded ${darkMode ? 'bg-gray-700 text-gray-300' : 'bg-gray-200 text-gray-600'}`}
+                    >
+                      <Edit2 size={16} />
+                    </button>
+                    <button
+                      onClick={() => deleteWorkout(workout.id)}
+                      className="p-2 rounded bg-red-600 text-white hover:bg-red-700"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+                </div>
+                
+                <div className="mb-3">
+                  {workout.exercises.slice(0, 2).map((exercise, index) => (
+                    <div key={index} className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>
+                      {exercise.name} - {exercise.totalSets}x{exercise.reps}
+                    </div>
+                  ))}
+                  {workout.exercises.length > 2 && (
+                    <span className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                      +{workout.exercises.length - 2} exercícios
+                    </span>
+                  )}
+                </div>
+                
+                <button
+                  onClick={() => loadWorkout(workout)}
+                  className="w-full px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+                >
+                  Iniciar Treino
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Empty State */}
+        {workouts.length === 0 && !showCreateForm && !showHistory && (
+          <div className="text-center py-12">
+            <Dumbbell size={48} className={`mx-auto mb-4 ${darkMode ? 'text-gray-600' : 'text-gray-400'}`} />
+            <p className={`text-lg ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+              Nenhum treino criado ainda
+            </p>
+            <p className={`text-sm ${darkMode ? 'text-gray-500' : 'text-gray-500'}`}>
+              Crie seu primeiro treino
+            </p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+export default GymApp; 
